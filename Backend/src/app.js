@@ -33,6 +33,7 @@ app.get("/notes",(req,res) =>{
     });
 })
 
+//delete is used to delete the data from the server and :index is used to get the index no of the note which we want to delete
 app.delete("/notes/:index",(req,res) =>{
     console.log("DELETE ROUTE HIT");
     const index = parseInt(req.params.index); //req.params.index gives the index no
@@ -50,5 +51,22 @@ app.delete("/notes/:index",(req,res) =>{
     });
 });
 
+//patch is used to update the data in the server and :index is used to get the index no of the note which we want to update
+app.patch("/notes/:index",(req,res) =>{
+    console.log("PATCH ROUTE HIT");
+    //we need to convert req.params.index to integer because req.params.index returns an string
+    const index = parseInt(req.params.index); //req.params.index gives the index no
+    if(index < 0 || index >= notes.length){ 
+        res.status(404).json({
+            message:"Invalid index..Notes not found"
+        });
+        return;
+    }
+    notes[index] = {...notes[index],...req.body};// Update the note with the new data
+    console.log(notes);
+    res.status(200).json({
+        message:"Notes updated successfully"
+    });
+});
 //exporting the app
 module.exports = app;
