@@ -16,6 +16,7 @@ const imagekit = new ImageKit({
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
+//function to upload file to cloudinary and return the url of the uploaded file
 async function uploadFile(buffer, fileName) {
     try {
         const result = await imagekit.files.upload({  // ✅ FIX HERE
