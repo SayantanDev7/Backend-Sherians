@@ -1,3 +1,4 @@
+//page.tsx is the root page for the application
 "use client"
 import React , {useState} from 'react'
 import Navbar from '@/components/navbar/Navbar'
