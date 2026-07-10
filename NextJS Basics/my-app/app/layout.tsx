@@ -1,8 +1,13 @@
-//layout.tsx is the root layout for the application
+// layout.tsx is the root layout for the entire application.
+// Mistake fixed: Shared layout components (like Navbar and Footer) belong here, not inside individual pages (like page.tsx).
+// Why: The root layout wraps all pages. Putting Navbar/Footer here ensures they stay mounted,
+// do not re-render/flash on page transition, and are automatically displayed on every single route (Home, About, Contact, Products, etc.).
 
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Navbar from "@/components/navbar/Navbar";
+import Footer from "@/components/Footer/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +34,19 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* Navbar is rendered at the top of every page */}
+        <Navbar />
+        
+        {/* Main content area takes up the remaining space */}
+        <main className="flex-1">
+          {children}
+        </main>
+        
+        {/* Footer is rendered at the bottom of every page */}
+        <Footer />
+      </body>
     </html>
   );
 }
+
