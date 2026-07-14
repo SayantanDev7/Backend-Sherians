@@ -23,16 +23,19 @@ const express = require('express');
 
 const app = express(); //calling express() is as same as createServer()
 
+//res -> object use to send response to the client
+//req -> object use to take request from the client
+
 app.get("/",(req,res)=>{
-    res.end("Hello World by express");
+    res.send("Hello World by express");
 })
 
 app.get("/notes",(req,res)=>{
-    res.end("Notes API by express");
+    res.send("Notes API by express");
 })
 
 app.get("/users",(req,res)=>{
-    res.end("Users API by express");
+    res.send("Users API by express");
 })
 
 app.listen(3000,() =>{
