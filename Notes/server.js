@@ -22,12 +22,18 @@ app.post("/notes",(req,res) =>{ ///notes is API name
      }
      notes.push(note);
      console.log(notes)
-     res.send("Note added successfully");
+     res.json({
+        message:"Note added successfully",
+        notes:notes //we add this to show that the note is added successfully and also show the note
+     })
      
 })
 
 app.get("/notes",(req,res)=>{
-    res.send(notes);
+    res.json({
+        message:"Notes fetched successfully",
+        notes:notes
+    });
 })
 app.listen(4000,() =>{
     console.log("Server started on port 4000");
