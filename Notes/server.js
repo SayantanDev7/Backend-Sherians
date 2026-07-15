@@ -13,14 +13,10 @@ let notes = [];
 
 //this server code is for handling one note at a time not multiple notes in an array of notes
 app.post("/notes",(req,res) =>{ ///notes is API name
-     const {id,title,description} = req.body;
+     
+    const newnote = req.body;
 
-     const note = {
-        id: notes.length+1,
-        title: title,
-        description: description
-     }
-     notes.push(note);
+    notes.push(...newnote);
      console.log(notes)
      res.json({
         message:"Note added successfully",
