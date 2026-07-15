@@ -31,6 +31,18 @@ app.get("/notes",(req,res)=>{
         notes:notes
     });
 })
+
+app.delete("/notes/:id",(req,res) =>{
+    const id = req.params.id; // id will be taken from the url path as parameter
+    
+    const filteredNotes = notes.filter((note) => note.id !== id); //we only store the notes which are not matching with the id
+    notes = filteredNotes; //then we update the notes
+    
+    res.json({
+        message:"Note deleted successfully",
+        notes:notes
+    });
+})
 app.listen(4000,() =>{
     console.log("Server started on port 4000");
 });
