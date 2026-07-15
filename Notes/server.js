@@ -25,6 +25,27 @@ app.post("/notes",(req,res) =>{ ///notes is API name
      
 })
 
+app.patch("/notes/:id",(req,res) =>{
+    const index = req.params.id;
+
+    const note = notes.find((note) => note.id === index);
+    if (!note) {
+        return res.status(404).json({
+            message: "Note not found"
+        });
+    }
+    const {title,description} = req.body;
+
+    note.title = title;
+    note.description = description;
+
+    res.json({
+        message:"Note updated successfully",
+        notes:notes
+    })
+    
+})
+
 app.get("/notes",(req,res)=>{
     res.json({
         message:"Notes fetched successfully",
