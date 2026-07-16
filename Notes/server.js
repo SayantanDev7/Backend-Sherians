@@ -28,14 +28,16 @@ app.post("/notes",(req,res) =>{ ///notes is API name
 app.patch("/notes/:id",(req,res) =>{
     const index = req.params.id;
 
+    //find() is used to find the note with the given id
     const note = notes.find((note) => note.id === index);
     if (!note) {
-        return res.status(404).json({
+        return res.status(404).json({ //status 404 means Not Found
             message: "Note not found"
         });
     }
     const {title,description} = req.body;
 
+    //assigning the value from req.body to the note
     note.title = title;
     note.description = description;
 
