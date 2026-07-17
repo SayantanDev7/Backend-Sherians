@@ -1,7 +1,7 @@
-
-
 const express = require('express');
+const connectToDb = require("./src/db/db");
 
+connectToDb(); //production says to call it in server.js file so thats its more readable 
 const app = express(); //server created
 
 app.use(express.json()); // parse JSON request body
