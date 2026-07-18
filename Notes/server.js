@@ -26,11 +26,14 @@ app.post("/notes",async (req,res) =>{ ///notes is API name
      
 })
 
-app.patch("/notes/:id",(req,res) =>{
+app.patch("/notes/:id",async (req,res) =>{
+    try{
     const index = req.params.id;
+    const note = await noteModel.findById(index);
+    
 
     //find() is used to find the note with the given id
-    const note = notes.find((note) => note.id === index);
+    // const note = notes.find((note) => note.id === index);
     if (!note) {
         return res.status(404).json({ //status 404 means Not Found
             message: "Note not found"
@@ -42,10 +45,19 @@ app.patch("/notes/:id",(req,res) =>{
     note.title = title;
     note.description = description;
 
+    await note.save(); // to save the changes in the database
+
     res.json({
         message:"Note updated successfully",
-        notes:notes
+        note:note
     })
+    }
+    catch(error){
+        res.status(500).json({
+            message:"Failed to update note",
+            error:error.message
+        })
+    }
     
 })
 
@@ -81,7 +93,8 @@ app.delete("/notes/:id",async (req,res) =>{
     
     res.json({
         message:"Note deleted successfully",
-        note:note
+        note:note,
+        success:true
     });
 })
 app.listen(4000,() =>{
