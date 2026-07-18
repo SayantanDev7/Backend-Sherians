@@ -1,5 +1,6 @@
 const express = require('express');
 const connectToDb = require("./src/db/db");
+const noteModel = require("./src/models/note.model");
 
 connectToDb(); //production says to call it in server.js file so thats its more readable 
 const app = express(); //server created
@@ -12,16 +13,16 @@ let notes = [];
 //to get the notes at first we need to post 
 
 //this server code is for handling one note at a time not multiple notes in an array of notes
-app.post("/notes",(req,res) =>{ ///notes is API name
+app.post("/notes",async (req,res) =>{ ///notes is API name
      
     const newnote = req.body;
-
-    notes.push(...newnote);
-     console.log(notes)
-     res.json({
-        message:"Note added successfully",
-        notes:notes //we add this to show that the note is added successfully and also show the note
-     })
+    
+    //now using model we are creating a new note 
+    await noteModel.create(newnote);
+    res.json({
+        message:"Note added successfully to database",
+        notes:newnote //we add this to show that the note is added successfully and also show the note
+    })
      
 })
 
