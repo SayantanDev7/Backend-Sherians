@@ -58,15 +58,30 @@ app.get("/notes",async (req,res)=>{
     })
 })
 
-app.delete("/notes/:id",(req,res) =>{
-    const id = req.params.id; // id will be taken from the url path as parameter
+app.delete("/notes/:id",async (req,res) =>{
+    const {id} = req.params;
+    if(!id || id.trim() === ""){
+        return res.status(404).json({
+            message:"Note id is required",
+            success:false
+        })
+    }
+    const note = await noteModel.findByIdAndDelete(id);
+    if(!note){
+        return res.status(404).json({
+            message:"Note not found",
+            success:false
+        })
+    }
+    console.log("The deleted note is ",note);
+    // const id = req.params.id; // id will be taken from the url path as parameter
     
-    const filteredNotes = notes.filter((note) => note.id !== id); //we only store the notes which are not matching with the id
-    notes = filteredNotes; //then we update the notes
+    // const filteredNotes = notes.filter((note) => note.id !== id); //we only store the notes which are not matching with the id
+    // notes = filteredNotes; //then we update the notes
     
     res.json({
         message:"Note deleted successfully",
-        notes:notes
+        note:note
     });
 })
 app.listen(4000,() =>{
