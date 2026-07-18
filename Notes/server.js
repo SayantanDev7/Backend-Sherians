@@ -49,11 +49,13 @@ app.patch("/notes/:id",(req,res) =>{
     
 })
 
-app.get("/notes",(req,res)=>{
+app.get("/notes",async (req,res)=>{
+    const notes = await noteModel.find(); //now this is interacting with mongo db
+    console.log("The notes are ",notes);
     res.json({
-        message:"Notes fetched successfully",
+        message:"All notes fetched successfully",
         notes:notes
-    });
+    })
 })
 
 app.delete("/notes/:id",(req,res) =>{
