@@ -1,0 +1,4 @@
+/* Global base reset — applied to everything */
+*, *::before, *::after {
+  box-sizing: border-box;
+}

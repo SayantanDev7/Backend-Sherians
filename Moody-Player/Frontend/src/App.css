@@ -1,0 +1,446 @@
+/* ─── Global Reset & Base ────────────────────────────────────────────────── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #0f0f1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+}
+
+/* ─── App Shell ──────────────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding-bottom: 3rem;
+}
+
+.app-header {
+  padding: 2rem;
+  text-align: center;
+}
+
+.app-header h1 {
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-header p {
+  color: #888;
+  margin-top: 0.4rem;
+  font-size: 1rem;
+}
+
+/* ─── Two Column Layout ──────────────────────────────────────────────────── */
+.app-main {
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 1rem;
+}
+
+/* Side-by-side columns on wide screens */
+.app-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* two equal columns */
+  gap: 1.5rem;
+  align-items: start; /* don't stretch columns to same height */
+}
+
+/* Stack vertically on small screens */
+@media (max-width: 768px) {
+  .app-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.app-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FACE DETECTOR STYLES
+═══════════════════════════════════════════════════════════════════════════ */
+.face-detector {
+  background: #1a1a2e;
+  border: 1px solid #2d2d4e;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.detector-title {
+  font-size: 1.4rem;
+  color: #a78bfa;
+}
+
+.status-text {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* ─── Video + Canvas Overlay ─────────────────────────────────────────────── */
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #2d2d4e;
+}
+
+.webcam-video {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+  background: #000;
+  min-height: 250px;
+}
+
+.detection-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Mood Badge ─────────────────────────────────────────────────────────── */
+.mood-display {
+  text-align: center;
+  background: #16213e;
+  border-radius: 10px;
+  padding: 0.8rem 1.5rem;
+  border: 1px solid #2d2d4e;
+  width: 100%;
+}
+
+.mood-display h3 {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mood-text {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #a78bfa;
+  text-transform: capitalize;
+}
+
+/* ─── Emotion Breakdown Bars (NEW) ───────────────────────────────────────── */
+.emotion-bars {
+  width: 100%;
+  background: #16213e;
+  border: 1px solid #2d2d4e;
+  border-radius: 12px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.emotion-bars-title {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.2rem;
+}
+
+/* One row = emoji label + bar + percentage */
+.emotion-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.emotion-bar-label {
+  width: 110px;          /* fixed width so all bars start at same X position */
+  font-size: 0.8rem;
+  color: #ccc;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+/* The gray background track */
+.emotion-bar-track {
+  flex: 1;               /* takes all remaining space */
+  height: 8px;
+  background: #2d2d4e;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+/* The colored fill — width comes from inline style (score × 100%) */
+.emotion-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  /* CSS transition makes the bar animate smoothly when width changes */
+  transition: width 0.4s ease;
+}
+
+.emotion-bar-pct {
+  width: 46px;            /* fixed width so percentages align on right */
+  font-size: 0.75rem;
+  color: #aaa;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.button-group {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn {
+  padding: 0.7rem 1.8rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.btn:hover { transform: scale(1.04); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-start {
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  color: #fff;
+}
+
+.btn-stop {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MUSIC PLAYER STYLES
+═══════════════════════════════════════════════════════════════════════════ */
+.music-player {
+  background: #1a1a2e;
+  border: 1px solid #2d2d4e;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  height: 100%;
+}
+
+/* Empty state — before any mood is detected */
+.music-player--empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.mp-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.mp-empty-text {
+  color: #666;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* ─── Mood Badge ─────────────────────────────────────────────────────────── */
+.mp-mood-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 2px solid;       /* border color set inline via style prop */
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+}
+
+.mp-mood-label {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mp-mood-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+/* ─── Now Playing Card ───────────────────────────────────────────────────── */
+.mp-now-playing {
+  background: #16213e;
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid #2d2d4e;
+}
+
+.mp-album-art {
+  font-size: 3.5rem;
+  line-height: 1;
+  /* subtle rotation animation so it feels "alive" */
+  animation: floatArt 3s ease-in-out infinite;
+}
+
+@keyframes floatArt {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+.mp-song-info {
+  text-align: center;
+}
+
+.mp-song-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.mp-song-artist {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.2rem;
+}
+
+.mp-song-duration {
+  font-size: 0.75rem;
+  color: #555;
+  margin-top: 0.15rem;
+}
+
+/* ─── Controls (Prev / Play / Next) ─────────────────────────────────────── */
+.mp-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.mp-btn {
+  background: #2d2d4e;
+  border: none;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.mp-btn:hover {
+  background: #3d3d6e;
+  transform: scale(1.1);
+}
+
+/* Bigger play button */
+.mp-btn--play {
+  width: 54px;
+  height: 54px;
+  font-size: 1.4rem;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+}
+
+.mp-btn--play:hover {
+  background: linear-gradient(135deg, #9370f0, #4a90e2);
+}
+
+.mp-playing-note {
+  font-size: 0.72rem;
+  color: #555;
+  text-align: center;
+}
+
+/* ─── Song List ──────────────────────────────────────────────────────────── */
+.mp-song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mp-list-title {
+  font-size: 0.7rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.3rem;
+}
+
+.mp-song-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+
+.mp-song-item:hover {
+  background: #16213e;
+}
+
+/* Highlighted active song */
+.mp-song-item--active {
+  background: #16213e;
+  border-color: #a78bfa44;
+}
+
+.mp-item-cover {
+  font-size: 1.4rem;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.mp-item-info {
+  flex: 1;
+  min-width: 0; /* prevents text from overflowing */
+}
+
+.mp-item-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* shows "..." when title is too long */
+}
+
+.mp-item-artist {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.1rem;
+}
+
+.mp-item-duration {
+  font-size: 0.75rem;
+  color: #555;
+  flex-shrink: 0;
+}
