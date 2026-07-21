@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect } from "react";
 import mockSongs from "../services/mockSongs";
+import MoodSongs from "./Songs";
 
 // 🎵 MusicPlayer receives two props:
 //   currentMood  → the detected emotion string (e.g. "happy")
@@ -143,28 +144,9 @@ const MusicPlayer = ({ currentMood }) => {
       )}
 
       {/* ── Song List ─────────────────────────────────────────────────────── */}
-      {/* Shows all songs for the current mood */}
-      {/* .map() iterates over the array and renders one <div> per song */}
-      <div className="mp-song-list">
-        <p className="mp-list-title">Up Next</p>
-
-        {songs.map((song, index) => (
-          // key={song.id} is REQUIRED by React when rendering lists
-          // It helps React track which items changed
-          <div
-            key={song.id}
-            className={`mp-song-item ${index === currentIndex ? "mp-song-item--active" : ""}`}
-            onClick={() => selectSong(index)} // click to select this song
-          >
-            <span className="mp-item-cover">{song.cover}</span>
-            <div className="mp-item-info">
-              <span className="mp-item-title">{song.title}</span>
-              <span className="mp-item-artist">{song.artist}</span>
-            </div>
-            <span className="mp-item-duration">{song.duration}</span>
-          </div>
-        ))}
-      </div>
+      {/* MoodSongs is a child component that receives the mood as a prop     */}
+      {/* and renders the song list internally using its own map()            */}
+      <MoodSongs mood={currentMood} />
     </div>
   );
 };
