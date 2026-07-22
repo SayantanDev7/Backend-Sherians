@@ -1,235 +1,206 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // FaceDetector.jsx
 //
-// This component does 4 things:
-//   1. Asks for camera permission and shows the webcam feed
-//   2. Loads the face-api.js AI models from /public/models/
-//   3. Runs face + expression detection every 300ms
-//   4. Shows ALL 7 emotion bars + calls onMoodChange to inform the parent (App)
+// CORRECT FLOW (fixed):
+//   1. On mount → only load AI models (no camera auto-start)
+//   2. User clicks "Start Camera" → ask for permission → start stream → start detection
+//   3. User clicks "Stop Camera"  → stop detection loop → stop video tracks → show placeholder
 //
-// NEW CONCEPT: Props going UP (child → parent via callback)
-//   App.jsx passes a function called onMoodChange to this component.
-//   When mood changes, we CALL that function to send the mood UP to App.
+// PROPS:
+//   onMoodChange(mood, expressions) → callback to lift state up to App.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useRef, useEffect, useState } from "react";
 import * as faceapi from "face-api.js";
 
-// FaceDetector receives one prop: onMoodChange
-// onMoodChange is a FUNCTION passed by App.jsx
-// When we detect a mood, we call: onMoodChange("happy")
-// This updates the state in App, which then passes mood to MusicPlayer
 const FaceDetector = ({ onMoodChange }) => {
-  const videoRef = useRef(null);  // reference to <video> element
-  const canvasRef = useRef(null); // reference to <canvas> element
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
 
-  const [isModelLoaded, setIsModelLoaded]   = useState(false);
-  const [currentMood, setCurrentMood]       = useState("");     // dominant mood name
-  const [allExpressions, setAllExpressions] = useState(null);  // { happy: 0.9, sad: 0.05, ... }
-  const [isDetecting, setIsDetecting]       = useState(false);
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const [isDetecting,   setIsDetecting]   = useState(false);
+  const [statusText,    setStatusText]    = useState("Loading AI models...");
 
-  // ── STEP 1: Load AI Models ───────────────────────────────────────────────
+  // null = not yet started, true = camera on, false = denied or stopped
+  const [cameraGranted, setCameraGranted] = useState(null);
+
+  // ── STEP 1: Load AI Models (runs once on mount — no camera yet) ───────────
   useEffect(() => {
-    const loadModels = async () => {
-      const MODEL_URL = "/models";
+    const load = async () => {
       try {
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
+          faceapi.nets.faceExpressionNet.loadFromUri("/models"),
+          faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
         ]);
         setIsModelLoaded(true);
-      } catch (err) {
-        console.error("❌ Model load failed:", err);
+        setStatusText("Click Start Camera to begin");
+      } catch (e) {
+        console.error("Model load failed:", e);
+        setStatusText("Model load failed ❌");
       }
     };
-    loadModels();
+    load();
+
+    // Cleanup on unmount: stop camera if it was running
+    return () => stopCameraStream();
   }, []);
 
-  // ── STEP 2: Start Webcam ─────────────────────────────────────────────────
-  useEffect(() => {
-    const startWebcam = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch (err) {
-        console.error("❌ Webcam error:", err);
-      }
-    };
-    startWebcam();
+  // ── Helper: stop the actual camera stream ─────────────────────────────────
+  // Called both from stopDetection() and cleanup on unmount
+  const stopCameraStream = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      // getTracks() gives all video/audio tracks — we stop every one
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null; // clear the reference
+    }
+  };
 
-    // Cleanup: stop camera when component unmounts
-    return () => {
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, []);
-
-  // ── STEP 3: Start Detection ──────────────────────────────────────────────
-  const startDetection = () => {
+  // ── STEP 2: Start Camera + Detection (triggered by button click) ──────────
+  const startDetection = async () => {
     if (!isModelLoaded) return;
-    setIsDetecting(true);
 
+    // Ask browser for camera permission
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+      // Attach stream to <video> element so it starts showing feed
+      if (videoRef.current) videoRef.current.srcObject = stream;
+
+      setCameraGranted(true);  // show video, hide placeholder
+      setIsDetecting(true);
+      setStatusText("Reading your mood...");
+    } catch (e) {
+      // User denied camera OR no camera found
+      setCameraGranted(false);
+      setStatusText("Camera access denied ❌");
+      return; // stop here — don't start detection
+    }
+
+    // Run expression detection every 300ms
     const interval = setInterval(async () => {
+      // readyState 4 = HAVE_ENOUGH_DATA — video is fully playing
       if (!videoRef.current || videoRef.current.readyState !== 4) return;
 
-      // Detect face + expressions
       const detection = await faceapi
         .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceExpressions();
 
       if (!detection) {
-        setCurrentMood("No face detected 👀");
-        setAllExpressions(null);
-        // Tell App.jsx no mood is active
-        if (onMoodChange) onMoodChange(null);
+        setStatusText("No face detected 👀");
+        onMoodChange?.(null, null);
         return;
       }
 
-      // ── Draw on Canvas ─────────────────────────────────────────────────
-      const canvas = canvasRef.current;
-      const video  = videoRef.current;
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      faceapi.matchDimensions(canvas, { width: video.videoWidth, height: video.videoHeight });
-      const resized = faceapi.resizeResults(detection, { width: video.videoWidth, height: video.videoHeight });
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      faceapi.draw.drawDetections(canvas, resized);
-      faceapi.draw.drawFaceLandmarks(canvas, resized);
+      // Draw face box + landmark dots on the canvas overlay
+      const cv  = canvasRef.current;
+      const vid = videoRef.current;
+      cv.width  = vid.videoWidth;
+      cv.height = vid.videoHeight;
+      faceapi.matchDimensions(cv, { width: vid.videoWidth, height: vid.videoHeight });
+      const resized = faceapi.resizeResults(detection, { width: vid.videoWidth, height: vid.videoHeight });
+      cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+      faceapi.draw.drawDetections(cv, resized);
+      faceapi.draw.drawFaceLandmarks(cv, resized);
 
-      // ── Get the Dominant Emotion ───────────────────────────────────────
+      // Find the emotion with the highest confidence score
       const expressions = detection.expressions;
-
-      // Store ALL expressions so we can draw the bars
-      setAllExpressions(expressions);
-
-      // Find the one with the highest score
       const dominant = Object.entries(expressions).reduce(
-        (max, [emotion, score]) => (score > max.score ? { emotion, score } : max),
+        (max, [e, s]) => s > max.score ? { emotion: e, score: s } : max,
         { emotion: "", score: 0 }
       );
 
-      const moodLabel = `${getMoodEmoji(dominant.emotion)} ${dominant.emotion}`;
-      setCurrentMood(moodLabel);
+      setStatusText(`Mood: ${dominant.emotion}`);
 
-      // ── LIFT STATE UP ──────────────────────────────────────────────────
-      // Call the parent's callback with just the emotion name string
-      // App.jsx will receive "happy" / "sad" / etc. and pass it to MusicPlayer
-      if (onMoodChange) onMoodChange(dominant.emotion);
+      // Send mood + full expressions object up to App.jsx via prop callback
+      onMoodChange?.(dominant.emotion, expressions);
 
     }, 300);
 
+    // Store interval ID on window so stopDetection can clear it
     window._detectionInterval = interval;
   };
 
+  // ── STEP 3: Stop Camera + Detection (triggered by button click) ───────────
   const stopDetection = () => {
+    // 1. Stop the detection loop
     clearInterval(window._detectionInterval);
-    setIsDetecting(false);
-    setCurrentMood("");
-    setAllExpressions(null);
-    if (onMoodChange) onMoodChange(null); // clear mood in App too
+
+    // 2. Stop the actual camera stream (this turns off the camera light)
+    stopCameraStream();
+
+    // 3. Clear the canvas drawing
     if (canvasRef.current) {
-      canvasRef.current.getContext("2d").clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      canvasRef.current.getContext("2d")
+        .clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
+
+    // 4. Reset all state — show placeholder again
+    setIsDetecting(false);
+    setCameraGranted(null);   // back to "not yet started" → shows placeholder
+    setStatusText("Click Start Camera to begin");
+    onMoodChange?.(null, null); // clear mood in App.jsx
   };
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const getMoodEmoji = (mood) => ({
-    happy: "😄", sad: "😢", angry: "😠",
-    fearful: "😨", disgusted: "🤢", surprised: "😲", neutral: "😐",
-  }[mood] || "🎭");
-
-  // Color for each emotion bar
-  const getEmotionColor = (emotion) => ({
-    happy:     "#facc15",
-    sad:       "#60a5fa",
-    angry:     "#f87171",
-    fearful:   "#c084fc",
-    disgusted: "#4ade80",
-    surprised: "#fb923c",
-    neutral:   "#94a3b8",
-  }[emotion] || "#a78bfa");
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="face-detector">
-      <h2 className="detector-title">🎭 Mood Detector</h2>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.8rem" }}>
 
-      <p className="status-text">
-        {isModelLoaded ? "✅ AI Models Ready" : "⏳ Loading AI Models..."}
+      {/* ── Circular Camera Ring ── */}
+      <div className="cam-ring">
+        <div className="cam-inner">
+
+          {/* User silhouette placeholder — shown when camera is off or not yet started */}
+          {!cameraGranted && (
+            <div className="cam-placeholder">
+              <svg
+                viewBox="0 0 100 100"
+                xmlns="http://www.w3.org/2000/svg"
+                className="cam-placeholder-svg"
+              >
+                {/* Head circle */}
+                <circle cx="50" cy="34" r="21" fill="#3a3a52" />
+                {/* Shoulders / body */}
+                <path d="M8 95 Q8 62 50 62 Q92 62 92 95 Z" fill="#3a3a52" />
+              </svg>
+            </div>
+          )}
+
+          {/* Video element — always in DOM so ref works.
+              Invisible when camera is off (opacity: 0) */}
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{ opacity: cameraGranted ? 1 : 0 }}
+          />
+
+          {/* Canvas overlaid on video for face boxes + landmarks */}
+          <canvas ref={canvasRef} />
+        </div>
+      </div>
+
+      {/* Status text */}
+      <p className={`cam-status ${isModelLoaded ? "ready" : ""}`}>
+        {statusText}
       </p>
 
-      {/* Webcam + Canvas overlay */}
-      <div className="video-wrapper">
-        <video ref={videoRef} autoPlay muted playsInline className="webcam-video" />
-        <canvas ref={canvasRef} className="detection-canvas" />
-      </div>
-
-      {/* ── Dominant Mood Badge ────────────────────────────────────────────── */}
-      {currentMood && (
-        <div className="mood-display">
-          <h3>Detected Mood</h3>
-          <p className="mood-text">{currentMood}</p>
-        </div>
+      {/* Start / Stop button — switches based on isDetecting state */}
+      {!isDetecting ? (
+        <button
+          className="cam-btn start"
+          onClick={startDetection}
+          disabled={!isModelLoaded}
+        >
+          📷 {isModelLoaded ? "Start Camera" : "Loading models..."}
+        </button>
+      ) : (
+        <button className="cam-btn stop" onClick={stopDetection}>
+          ⏹ Stop Camera
+        </button>
       )}
-
-      {/* ── STEP 1: Emotion Breakdown Bars ────────────────────────────────── */}
-      {/* This is new! We show ALL 7 emotions as animated progress bars      */}
-      {/* allExpressions is the object: { happy: 0.9, sad: 0.02, ... }       */}
-      {allExpressions && (
-        <div className="emotion-bars">
-          <p className="emotion-bars-title">Expression Breakdown</p>
-
-          {/* Object.entries() turns { happy: 0.9 } into [["happy", 0.9], ...]  */}
-          {/* We sort so the highest score is at the top                         */}
-          {Object.entries(allExpressions)
-            .sort(([, a], [, b]) => b - a) // sort descending by score
-            .map(([emotion, score]) => (
-              <div key={emotion} className="emotion-bar-row">
-
-                {/* Emotion label on the left */}
-                <span className="emotion-bar-label">
-                  {getMoodEmoji(emotion)} {emotion}
-                </span>
-
-                {/* The bar track (gray background) */}
-                <div className="emotion-bar-track">
-                  {/* The filled portion — width is the score as a % */}
-                  {/* score is 0.0 → 1.0, multiply by 100 to get 0%→100% */}
-                  <div
-                    className="emotion-bar-fill"
-                    style={{
-                      width: `${(score * 100).toFixed(1)}%`,
-                      backgroundColor: getEmotionColor(emotion),
-                    }}
-                  />
-                </div>
-
-                {/* Percentage on the right */}
-                <span className="emotion-bar-pct">
-                  {(score * 100).toFixed(1)}%
-                </span>
-
-              </div>
-            ))}
-        </div>
-      )}
-
-      {/* Start / Stop buttons */}
-      <div className="button-group">
-        {!isDetecting ? (
-          <button onClick={startDetection} disabled={!isModelLoaded} className="btn btn-start">
-            {isModelLoaded ? "🚀 Start Detection" : "⏳ Loading..."}
-          </button>
-        ) : (
-          <button onClick={stopDetection} className="btn btn-stop">
-            ⏹ Stop Detection
-          </button>
-        )}
-      </div>
     </div>
   );
 };
