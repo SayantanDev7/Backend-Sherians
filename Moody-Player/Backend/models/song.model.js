@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+//schema for song data
 const songschema = new mongoose.Schema({
     title:{type:String},
     artist:{type:String},

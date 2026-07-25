@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+//imagekit initialization
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
@@ -16,7 +17,7 @@ async function uploadFile(file) {
   try {
     const result = await imagekit.files.upload({
       file: await toFile(file.buffer, file.originalname),
-      fileName: file.originalname,
+      fileName: file.originalname,  //  The filename is stored as "24-07-25T01_01_01_462Z_240725-010101_462Z_song1_4a6fa8a1-8291-46ab-942a-fbc3e0bf6005.mp3" in the server
       folder: "/songs",
     });
 
