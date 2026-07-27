@@ -1,30 +1,43 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // FaceDetector.jsx
 //
-// CORRECT FLOW (fixed):
-//   1. On mount → only load AI models (no camera auto-start)
-//   2. User clicks "Start Camera" → ask for permission → start stream → start detection
-//   3. User clicks "Stop Camera"  → stop detection loop → stop video tracks → show placeholder
+// MOOD LOCKING FLOW:
+//   1. User clicks "Start Camera" → camera opens, 5-second sampling begins
+//   2. Every 300ms, the dominant emotion is added to a votes array
+//   3. After 5 seconds → pick the most voted emotion → LOCK the mood
+//   4. onMoodChange() is called ONCE with the locked mood → songs fetch
+//   5. Camera stays on so the face box is visible, but mood no longer changes
+//   6. "Re-detect Mood" button resets everything and starts over
 //
 // PROPS:
-//   onMoodChange(mood, expressions) → callback to lift state up to App.jsx
+//   onMoodChange(mood, expressions)   → called once when mood is locked
+//   onExpressionsUpdate(expressions)  → called every 300ms for live bars
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useRef, useEffect, useState } from "react";
 import * as faceapi from "face-api.js";
 
-const FaceDetector = ({ onMoodChange }) => {
+const LOCK_AFTER_MS  = 5000; // sample for 5 seconds before locking
+const DETECT_INTERVAL = 300; // run detection every 300ms
+
+const FaceDetector = ({ onMoodChange, onExpressionsUpdate }) => {
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
 
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [isDetecting,   setIsDetecting]   = useState(false);
+  const [isMoodLocked,  setIsMoodLocked]  = useState(false);
   const [statusText,    setStatusText]    = useState("Loading AI models...");
-
-  // null = not yet started, true = camera on, false = denied or stopped
+  const [countdown,     setCountdown]     = useState(null); // seconds left
   const [cameraGranted, setCameraGranted] = useState(null);
 
-  // ── STEP 1: Load AI Models (runs once on mount — no camera yet) ───────────
+  // Refs for mutable values that shouldn't cause re-renders
+  const moodVotes     = useRef({});   // { happy: 4, sad: 1, ... }
+  const lockTimerRef  = useRef(null);
+  const intervalRef   = useRef(null);
+  const countdownRef  = useRef(null);
+
+  // ── STEP 1: Load AI Models ────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
@@ -41,45 +54,58 @@ const FaceDetector = ({ onMoodChange }) => {
       }
     };
     load();
-
-    // Cleanup on unmount: stop camera if it was running
     return () => stopCameraStream();
   }, []);
 
   // ── Helper: stop the actual camera stream ─────────────────────────────────
-  // Called both from stopDetection() and cleanup on unmount
   const stopCameraStream = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      // getTracks() gives all video/audio tracks — we stop every one
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null; // clear the reference
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
     }
   };
 
-  // ── STEP 2: Start Camera + Detection (triggered by button click) ──────────
+  // ── Helper: clear all timers ──────────────────────────────────────────────
+  const clearAllTimers = () => {
+    clearInterval(intervalRef.current);
+    clearTimeout(lockTimerRef.current);
+    clearInterval(countdownRef.current);
+  };
+
+  // ── STEP 2: Start Camera + 5-second mood sampling ─────────────────────────
   const startDetection = async () => {
     if (!isModelLoaded) return;
 
-    // Ask browser for camera permission
+    // Ask for camera permission
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-
-      // Attach stream to <video> element so it starts showing feed
       if (videoRef.current) videoRef.current.srcObject = stream;
-
-      setCameraGranted(true);  // show video, hide placeholder
-      setIsDetecting(true);
-      setStatusText("Reading your mood...");
+      setCameraGranted(true);
     } catch (e) {
-      // User denied camera OR no camera found
       setCameraGranted(false);
       setStatusText("Camera access denied ❌");
-      return; // stop here — don't start detection
+      return;
     }
 
-    // Run expression detection every 300ms
-    const interval = setInterval(async () => {
-      // readyState 4 = HAVE_ENOUGH_DATA — video is fully playing
+    // Reset state for a fresh scan
+    moodVotes.current = {};
+    setIsDetecting(true);
+    setIsMoodLocked(false);
+    setCountdown(Math.ceil(LOCK_AFTER_MS / 1000));
+
+    // Countdown display timer (ticks every second)
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Detection loop — samples mood every 300ms
+    intervalRef.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState !== 4) return;
 
       const detection = await faceapi
@@ -89,11 +115,10 @@ const FaceDetector = ({ onMoodChange }) => {
 
       if (!detection) {
         setStatusText("No face detected 👀");
-        onMoodChange?.(null, null);
         return;
       }
 
-      // Draw face box + landmark dots on the canvas overlay
+      // Draw face box + landmarks on canvas
       const cv  = canvasRef.current;
       const vid = videoRef.current;
       cv.width  = vid.videoWidth;
@@ -104,43 +129,78 @@ const FaceDetector = ({ onMoodChange }) => {
       faceapi.draw.drawDetections(cv, resized);
       faceapi.draw.drawFaceLandmarks(cv, resized);
 
-      // Find the emotion with the highest confidence score
       const expressions = detection.expressions;
+
+      // Find dominant emotion for this sample
       const dominant = Object.entries(expressions).reduce(
         (max, [e, s]) => s > max.score ? { emotion: e, score: s } : max,
         { emotion: "", score: 0 }
       );
 
-      setStatusText(`Mood: ${dominant.emotion}`);
+      // Add vote for this emotion
+      moodVotes.current[dominant.emotion] = (moodVotes.current[dominant.emotion] || 0) + 1;
 
-      // Send mood + full expressions object up to App.jsx via prop callback
-      onMoodChange?.(dominant.emotion, expressions);
+      // Send live expressions to App.jsx for the animated bars (no mood lock yet)
+      onExpressionsUpdate?.(expressions);
 
-    }, 300);
+      setStatusText(`Analyzing your mood... 🔍`);
 
-    // Store interval ID on window so stopDetection can clear it
-    window._detectionInterval = interval;
+    }, DETECT_INTERVAL);
+
+    // ── After LOCK_AFTER_MS: pick winner and lock mood ──────────────────────
+    lockTimerRef.current = setTimeout(() => {
+      clearInterval(intervalRef.current); // stop the sampling loop
+
+      const votes = moodVotes.current;
+      const lockedMood = Object.entries(votes).reduce(
+        (winner, [emotion, count]) => count > winner.count
+          ? { emotion, count }
+          : winner,
+        { emotion: "neutral", count: 0 }
+      ).emotion;
+
+      setIsMoodLocked(true);
+      setIsDetecting(false);
+      setCountdown(null);
+      setStatusText(`Mood locked: ${lockedMood} 🔒`);
+
+      // Tell App.jsx the final locked mood — this triggers song fetch
+      onMoodChange?.(lockedMood, null);
+
+    }, LOCK_AFTER_MS);
   };
 
-  // ── STEP 3: Stop Camera + Detection (triggered by button click) ───────────
-  const stopDetection = () => {
-    // 1. Stop the detection loop
-    clearInterval(window._detectionInterval);
-
-    // 2. Stop the actual camera stream (this turns off the camera light)
+  // ── Stop Camera completely ─────────────────────────────────────────────────
+  const stopCamera = () => {
+    clearAllTimers();
     stopCameraStream();
 
-    // 3. Clear the canvas drawing
     if (canvasRef.current) {
       canvasRef.current.getContext("2d")
         .clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
 
-    // 4. Reset all state — show placeholder again
     setIsDetecting(false);
-    setCameraGranted(null);   // back to "not yet started" → shows placeholder
+    setIsMoodLocked(false);
+    setCameraGranted(null);
+    setCountdown(null);
     setStatusText("Click Start Camera to begin");
-    onMoodChange?.(null, null); // clear mood in App.jsx
+    onMoodChange?.(null, null);
+    onExpressionsUpdate?.(null);
+  };
+
+  // ── Re-detect: keep camera on, restart the 5-second sampling ─────────────
+  const reDetect = () => {
+    clearAllTimers();
+    if (canvasRef.current) {
+      canvasRef.current.getContext("2d")
+        .clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    moodVotes.current = {};
+    setIsMoodLocked(false);
+    onMoodChange?.(null, null);    // clear songs while re-detecting
+    onExpressionsUpdate?.(null);
+    startDetection();              // restart the whole flow
   };
 
   // ── RENDER ────────────────────────────────────────────────────────────────
@@ -151,24 +211,34 @@ const FaceDetector = ({ onMoodChange }) => {
       <div className="cam-ring">
         <div className="cam-inner">
 
-          {/* User silhouette placeholder — shown when camera is off or not yet started */}
+          {/* Placeholder when camera is off */}
           {!cameraGranted && (
             <div className="cam-placeholder">
-              <svg
-                viewBox="0 0 100 100"
-                xmlns="http://www.w3.org/2000/svg"
-                className="cam-placeholder-svg"
-              >
-                {/* Head circle */}
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="cam-placeholder-svg">
                 <circle cx="50" cy="34" r="21" fill="#3a3a52" />
-                {/* Shoulders / body */}
                 <path d="M8 95 Q8 62 50 62 Q92 62 92 95 Z" fill="#3a3a52" />
               </svg>
             </div>
           )}
 
-          {/* Video element — always in DOM so ref works.
-              Invisible when camera is off (opacity: 0) */}
+          {/* Countdown ring overlay during sampling */}
+          {isDetecting && countdown !== null && (
+            <div style={{
+              position: "absolute", inset: 0, zIndex: 4,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "none",
+            }}>
+              <div style={{
+                background: "rgba(0,0,0,0.55)", borderRadius: "50%",
+                width: "56px", height: "56px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.6rem", fontWeight: 800, color: "#a78bfa",
+              }}>
+                {countdown}
+              </div>
+            </div>
+          )}
+
           <video
             ref={videoRef}
             autoPlay
@@ -176,8 +246,6 @@ const FaceDetector = ({ onMoodChange }) => {
             playsInline
             style={{ opacity: cameraGranted ? 1 : 0 }}
           />
-
-          {/* Canvas overlaid on video for face boxes + landmarks */}
           <canvas ref={canvasRef} />
         </div>
       </div>
@@ -187,8 +255,12 @@ const FaceDetector = ({ onMoodChange }) => {
         {statusText}
       </p>
 
-      {/* Start / Stop button — switches based on isDetecting state */}
-      {!isDetecting ? (
+      {/* Button logic:
+          - Not started → "Start Camera"
+          - Detecting (sampling) → no button (countdown is showing)
+          - Mood locked → "Re-detect Mood" + "Stop Camera"
+          - Camera granted but not locked/detecting → "Stop Camera" */}
+      {!cameraGranted && !isDetecting && (
         <button
           className="cam-btn start"
           onClick={startDetection}
@@ -196,9 +268,22 @@ const FaceDetector = ({ onMoodChange }) => {
         >
           📷 {isModelLoaded ? "Start Camera" : "Loading models..."}
         </button>
-      ) : (
-        <button className="cam-btn stop" onClick={stopDetection}>
-          ⏹ Stop Camera
+      )}
+
+      {isMoodLocked && (
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="cam-btn start" onClick={reDetect}>
+            🔄 Re-detect Mood
+          </button>
+          <button className="cam-btn stop" onClick={stopCamera}>
+            ⏹ Stop
+          </button>
+        </div>
+      )}
+
+      {isDetecting && (
+        <button className="cam-btn stop" onClick={stopCamera}>
+          ✕ Cancel
         </button>
       )}
     </div>

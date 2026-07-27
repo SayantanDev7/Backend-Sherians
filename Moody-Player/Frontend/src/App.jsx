@@ -1,8 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import './App.css'
 import FaceDetector from './components/FaceDetector'
 import MusicPlayer  from './components/MusicPlayer'
-import mockSongs    from './services/mockSongs'
+import { getSongsByMood } from './services/api'
 
 // ── Greeting helper ──────────────────────────────────────────────────────────
 const getGreeting = () => {
@@ -30,36 +30,92 @@ const moodEmoji = {
 }
 
 const App = () => {
-  // currentMood lives here in the parent (lifting state up pattern)
   const [currentMood, setCurrentMood] = useState(null)
-
-  // allExpressions: { happy: 0.9, sad: 0.05, ... } for the mini bars
   const [allExpressions, setAllExpressions] = useState(null)
+
+  // Songs fetched from the backend
+  const [songs, setSongs]       = useState([])
+  const [isLoading, setIsLoading] = useState(false)
 
   // Which song is "playing" in the right panel + bottom bar
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying]       = useState(false)
   const [liked, setLiked]               = useState(false)
-  const [progress, setProgress]         = useState(35)   // fake progress %
+  const [progress, setProgress]         = useState(0)
+
+  // Real audio element ref for playback
+  const audioRef = useRef(null)
+
+  // ── Fetch songs from backend when mood changes ────────────────────────────
+  useEffect(() => {
+    if (!currentMood) {
+      setSongs([])
+      return
+    }
+    const fetchSongs = async () => {
+      setIsLoading(true)
+      try {
+        const data = await getSongsByMood(currentMood)
+        setSongs(data)
+        setCurrentIndex(0)   // reset to first song on mood change
+        setIsPlaying(false)
+      } catch (err) {
+        console.error('Failed to fetch songs:', err.message)
+        setSongs([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchSongs()
+  }, [currentMood])
+
+  // ── Control HTML audio element when song or play state changes ────────────
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const currentSong = songs[currentIndex]
+    if (!currentSong?.audio) return
+
+    // If the src changed, load the new song
+    if (audio.src !== currentSong.audio) {
+      audio.src = currentSong.audio
+      audio.load()
+    }
+
+    if (isPlaying) {
+      audio.play().catch(e => console.error('Playback error:', e))
+    } else {
+      audio.pause()
+    }
+  }, [isPlaying, currentIndex, songs])
 
   // Called by FaceDetector whenever mood changes
-  // mood        → string like "happy" / null when no face
-  // expressions → { happy: 0.9, sad: 0.05, ... } / null
   const handleMoodChange = (mood, expressions) => {
     setCurrentMood(mood)
     setAllExpressions(expressions || null)
-    if (mood) {                // only reset song if a new mood is detected
+    if (mood) {
       setCurrentIndex(0)
       setIsPlaying(false)
     }
   }
 
-  // Songs for current mood
-  const songs = currentMood ? (mockSongs[currentMood] || mockSongs.neutral) : []
+  // Called every 300ms during sampling for live expression bars
+  // Does NOT change currentMood or fetch songs — only updates the bars
+  const handleExpressionsUpdate = (expressions) => {
+    setAllExpressions(expressions || null)
+  }
+
   const currentSong = songs[currentIndex]
 
-  const nextSong = () => setCurrentIndex(i => (i + 1) % songs.length)
-  const prevSong = () => setCurrentIndex(i => (i - 1 + songs.length) % songs.length)
+  const nextSong = () => {
+    setCurrentIndex(i => (i + 1) % songs.length)
+    setIsPlaying(true) // auto-play next
+  }
+  const prevSong = () => {
+    setCurrentIndex(i => (i - 1 + songs.length) % songs.length)
+    setIsPlaying(true) // auto-play prev
+  }
   const togglePlay = () => setIsPlaying(p => !p)
 
   // Emotion color map
@@ -70,6 +126,9 @@ const App = () => {
 
   return (
     <div className="app-shell">
+
+      {/* Hidden audio element — controlled via audioRef */}
+      <audio ref={audioRef} onEnded={nextSong} />
 
       {/* ════════════════════════════════════════════════════════
           LEFT SIDEBAR
@@ -137,8 +196,7 @@ const App = () => {
           <div className="cam-zone">
             <FaceDetector
               onMoodChange={handleMoodChange}
-              // Compact mode — just video + canvas, no extra UI chrome
-              compact={true}
+              onExpressionsUpdate={handleExpressionsUpdate}
             />
           </div>
 
@@ -210,18 +268,25 @@ const App = () => {
             <button className="see-all">See all</button>
           </div>
 
-          {songs.length > 0 ? (
+          {isLoading ? (
+            <p style={{ color: "var(--text3)", fontSize: "0.85rem" }}>
+              🎵 Loading songs for your mood...
+            </p>
+          ) : songs.length > 0 ? (
             <div className="song-cards-row">
               {songs.map((song, idx) => (
                 <div
-                  key={song.id}
-                  className="song-card"
+                  key={song._id}
+                  className={`song-card ${currentIndex === idx ? 'active' : ''}`}
                   onClick={() => { setCurrentIndex(idx); setIsPlaying(true) }}
                 >
                   <div className="song-card-art">
-                    {song.cover}
+                    {/* DB songs don't have cover art yet — use emoji fallback */}
+                    🎵
                     <div className="play-overlay">
-                      <button className="play-overlay-btn">▶</button>
+                      <button className="play-overlay-btn">
+                        {currentIndex === idx && isPlaying ? '⏸' : '▶'}
+                      </button>
                     </div>
                   </div>
                   <p className="song-card-title">{song.title}</p>
@@ -234,7 +299,9 @@ const App = () => {
             </div>
           ) : (
             <p style={{ color: "var(--text3)", fontSize: "0.85rem" }}>
-              Start face detection to get song recommendations.
+              {currentMood
+                ? `No songs found for "${currentMood}" mood.`
+                : "Start face detection to get song recommendations."}
             </p>
           )}
         </div>
