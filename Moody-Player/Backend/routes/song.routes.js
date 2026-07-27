@@ -90,21 +90,33 @@ router.post('/songs', upload.array('audio', 20), async (req, res) => {
 // GET /songs             → fetch all songs (no mood filter)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/songs", async (req, res) => {
-    const mood = req.query.mood;
-    const filter = mood ? { mood: mood } : {}; // if mood is provided, filter by it
+    try {
+        const mood = req.query.mood ? req.query.mood.toLowerCase().trim() : null;
+        const filter = mood ? { mood: mood } : {};
 
-    const songs = await songModel.find(filter);
+        // console.log("Filter being used:", filter); // debug: see what filter is sent to DB
 
-    if (songs.length === 0) {
-        return res.status(404).json({
-            message: mood ? `No songs found for mood: ${mood}` : "No songs found",
+        const songs = await songModel.find(filter);
+
+        // console.log("Songs found:", songs.length); // debug: see how many songs came back
+
+        if (songs.length === 0) {
+            return res.status(404).json({
+                message: mood ? `No songs found for mood: ${mood}` : "No songs found",
+            });
+        }
+
+        res.status(200).json({
+            message: "Songs fetched successfully",
+            songs: songs,
+        });
+    } catch (error) {
+        console.error("Error fetching songs:", error.message);
+        res.status(500).json({
+            message: "Failed to fetch songs",
+            error: error.message,
         });
     }
-
-    res.status(200).json({
-        message: "Songs fetched successfully",
-        songs: songs,
-    });
 });
 
 export default router;
