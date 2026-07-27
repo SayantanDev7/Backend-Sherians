@@ -41,15 +41,22 @@ router.post('/songs', upload.array('audio', 20), async (req, res) => {
         const artists = toArray(req.body.artist);
         const albums  = toArray(req.body.album);
         const genres  = toArray(req.body.genre);
-        const moods   = toArray(req.body.mood);
 
-        // Validate: number of files must match number of titles/moods
-        if (files.length !== titles.length || files.length !== moods.length) {
+        // Each mood entry can be a comma-separated string for one song
+        // e.g. "energetic,happy" → ["energetic", "happy"]
+        // This allows one song to belong to multiple moods
+        const rawMoods = toArray(req.body.mood);
+        const moods = rawMoods.map(m => 
+            m.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+        );
+
+        // Validate: number of files must match number of titles
+        // (moods are now per-song arrays so we don't compare their count directly)
+        if (files.length !== titles.length) {
             return res.status(400).json({
-                message: "Mismatch: number of audio files must equal number of titles and moods.",
+                message: "Mismatch: number of audio files must equal number of titles.",
                 filesReceived: files.length,
                 titlesReceived: titles.length,
-                moodsReceived: moods.length,
             });
         }
 
@@ -64,7 +71,7 @@ router.post('/songs', upload.array('audio', 20), async (req, res) => {
                 genre:   genres[index]   || "",
                 audio:   filedata.url,
                 fileId:  filedata.fileId,
-                mood:    moods[index],
+                mood:    moods[index] || [],  // array of moods for this song
             });
         });
 

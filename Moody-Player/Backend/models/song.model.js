@@ -5,7 +5,7 @@ const songschema = new mongoose.Schema({
     title:{type:String},
     artist:{type:String},
     audio:String,
-    mood:{type:String, lowercase:true}, // Mongoose auto-converts to lowercase before saving
+    mood:{type:[String], lowercase:true}, // Array — one song can have multiple moods e.g. ["energetic","happy"]
 })
 
 const song = mongoose.model("song", songschema);
