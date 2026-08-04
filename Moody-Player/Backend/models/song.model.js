@@ -25,7 +25,8 @@ const songschema = new mongoose.Schema({
             "calm",
             "sad",
             "focus",
-            "angry"
+            "angry",
+            "neutral"
         ],
         message: "{VALUE} is not a supported mood."
     }
