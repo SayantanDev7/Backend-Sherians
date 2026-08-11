@@ -11,3 +11,5 @@ const connectToDb =  async () =>{
         console.log(error)
     }
 }
+
+export default connectToDb;

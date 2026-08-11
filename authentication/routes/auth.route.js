@@ -1,5 +1,5 @@
 import express from "express"
-import authModel from "../models/auth.model"
+import authModel from "../models/auth.model.js"
 
 const router = express.Router();
 
