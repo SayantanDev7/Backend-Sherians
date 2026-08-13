@@ -1,19 +1,54 @@
 import express from "express"
 import authModel from "../models/auth.model.js"
+import bcrypt from "bcrypt"
 
 const router = express.Router();
 
 router.post("/signup",async(req,res)=>{
-    const {username,email,password} = req.body;
-    if(username==undefined || email==undefined || password==undefined){
-        return res.status(400).json({success:false,message:"Please enter all the fields"})
-    }
+    const username = req.body.username?.trim();
+    const email = req.body.email?.trim().toLowerCase();
+    const password = req.body.password;
+    
+    if (!username || !email || !password) {
+    return res.status(400).json({
+        success: false,
+        message: "Please enter all the fields"
+    });
+}
     const user = await authModel.findOne({email});
     if(user){
         return res.status(400).json({success:false,message:"User already exists"})
     }
-    const auth = await authModel.create({username,email,password})
-    res.json({success:true,message:"User created successfully",auth})
+
+    
+
+    try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await authModel.create({
+        username,
+        email,
+        password: hashedPassword
+    });
+    res.json({success:true,message:"User created successfully",user: {
+        id: user._id,
+        username: user.username,
+        email: user.email
+    }})
+
+    } 
+    catch (error) {
+    console.log(error);
+    if (error.code === 11000) {
+        return res.status(409).json({
+            message: "Email or username already exists"
+        });
+    }
+    else{
+        return res.status(500).json({success:false,message:"Internal server error"})
+    }
+    }
+    
 })
 
 router.post("/login",async(req,res)=>{
@@ -25,10 +60,14 @@ router.post("/login",async(req,res)=>{
     if(!user){
         return res.status(400).json({success:false,message:"User not found"})
     }
-    if(user.password!==password){
+    const matchPassword = await bcrypt.compare(password, user.password);
+    if(!matchPassword){
         return res.status(400).json({success:false,message:"Invalid password"})
     }
-    res.json({success:true,message:"User logged in successfully",user})
+    res.json({success:true,message:"User logged in successfully",user: {
+        username: user.username,
+        email: user.email
+    }})
 })
 
 router.get("/user/:username",async(req,res) =>{
