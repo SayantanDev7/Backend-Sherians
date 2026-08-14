@@ -1,6 +1,8 @@
 import express from "express"
 import authModel from "../models/auth.model.js"
 import bcrypt from "bcrypt"
+import jwt from "jsonwebtoken"
+
 
 const router = express.Router();
 
@@ -52,8 +54,9 @@ router.post("/signup",async(req,res)=>{
 })
 
 router.post("/login",async(req,res)=>{
-    const {email,password} = req.body;
-    if(email==undefined || password==undefined){
+    let {email,password} = req.body;
+    email = email?.trim().toLowerCase();
+    if(!email || !password){
         return res.status(400).json({success:false,message:"Please enter all the fields"})
     }
     const user = await authModel.findOne({email});
@@ -64,16 +67,45 @@ router.post("/login",async(req,res)=>{
     if(!matchPassword){
         return res.status(400).json({success:false,message:"Invalid password"})
     }
+
+    //create JWT
+    const token = jwt.sign({
+        id: user._id,
+        username: user.username,
+    },process.env.JWT_SECRET,{
+        expiresIn: "1h"
+    })
+
     res.json({success:true,message:"User logged in successfully",user: {
         username: user.username,
-        email: user.email
+        email: user.email,
+        token:token
     }})
 })
 
 router.get("/user/:username",async(req,res) =>{
     const {username} = req.params;
+    const {token} = req.body;
+    
     if(username==undefined){
         return res.status(400).json({success:false,message:"Please enter username"})
+    }
+
+    if(!token){
+        return res.status(401).json({
+            message:"Unauthorized"
+        })
+    }
+
+    //just to verify the token we use jwt.verify nothing else
+    try {
+        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+        if(decodedToken.username !== username){
+            return res.status(401).json({success:false,message:"Unauthorized"})
+        }
+    } catch (error) {
+        console.log(error);
+        return res.status(401).json({success:false,message:"Unauthorized"})
     }
     const user = await authModel.findOne({username});
     if(user){
