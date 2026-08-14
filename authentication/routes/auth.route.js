@@ -16,7 +16,8 @@ router.post("/signup",async(req,res)=>{
         success: false,
         message: "Please enter all the fields"
     });
-}
+    }
+
     const user = await authModel.findOne({email});
     if(user){
         return res.status(400).json({success:false,message:"User already exists"})
@@ -76,16 +77,18 @@ router.post("/login",async(req,res)=>{
         expiresIn: "1h"
     })
 
+    //send the token in cookie
+    res.cookie("token",token);
+
     res.json({success:true,message:"User logged in successfully",user: {
         username: user.username,
         email: user.email,
-        token:token
     }})
 })
 
 router.get("/user/:username",async(req,res) =>{
     const {username} = req.params;
-    const {token} = req.body;
+    const token = req.cookies.token; //now no need of passing token in the request body
     
     if(username==undefined){
         return res.status(400).json({success:false,message:"Please enter username"})
@@ -103,17 +106,20 @@ router.get("/user/:username",async(req,res) =>{
         if(decodedToken.username !== username){
             return res.status(401).json({success:false,message:"Unauthorized"})
         }
+        const user = await authModel.findOne({
+            _id:decodedToken.id
+        })
+        if(user){
+            return res.json({success:true,message:"User fetched successfully",user})
+        }
+        else{
+            return res.status(404).json({success:false,message:"User not found"})
+        }
     } catch (error) {
         console.log(error);
         return res.status(401).json({success:false,message:"Unauthorized"})
     }
-    const user = await authModel.findOne({username});
-    if(user){
-        return res.json({success:true,message:"User fetched successfully",user})
-    }
-    else{
-        return res.status(404).json({success:false,message:"User not found"})
-    }
+
 })
 
 router.get("/logout/:username",async(req,res) =>{
