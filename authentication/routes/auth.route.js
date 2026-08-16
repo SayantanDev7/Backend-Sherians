@@ -78,7 +78,12 @@ router.post("/login",async(req,res)=>{
     })
 
     //send the token in cookie
-    res.cookie("token",token);
+     res.cookie("token", token, {
+        httpOnly: true, //to make sure browser cant access the cookie
+        secure: process.env.NODE_ENV === "production", //to make sure cookie is only sent in https connection
+        sameSite: "strict", //to prevent cross site request forgery
+        maxAge: 60 * 60 * 1000 //cookie will expire in 1 hour
+    });
 
     res.json({success:true,message:"User logged in successfully",user: {
         username: user.username,
@@ -122,19 +127,13 @@ router.get("/user/:username",async(req,res) =>{
 
 })
 
-router.get("/logout/:username",async(req,res) =>{
-    const {username} = req.params;
-    if(username==undefined){
-        return res.status(400).json({success:false,message:"Please enter username to log out"})
-    }
-    const user = await authModel.findOne({username});
-    if(user){
-        await authModel.deleteOne({username});
-        return res.json({success:true,message:"User logged out successfully",user})
-    }
-    else{
-        return res.status(404).json({success:false,message:"User not found"})
-    }
+// No need for username or any query parameter during logout.
+// Each browser has its own cookie, so when a user requests logout,
+// their browser automatically sends its token cookie to the server.
+// We simply clear that cookie; the user account remains in MongoDB.
+router.get("/logout",async(req,res) =>{
+   res.clearCookie("token");
+   res.json({success:true,message:"User logged out successfully"})
 })
 
 export default router;
