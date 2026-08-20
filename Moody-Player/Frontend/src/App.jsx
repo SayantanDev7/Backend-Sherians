@@ -147,7 +147,7 @@ const App = () => {
 
         {/* Nav */}
         <button className="nav-item active">
-          <span className="nav-icon">🏠</span> Home
+          <span className="nav-icon"></span> Home
         </button>
         <button className="nav-item">
           <span className="nav-icon">🎵</span> My Library
@@ -156,11 +156,9 @@ const App = () => {
           <span className="nav-icon">❤️</span> Favorites
         </button>
         <button className="nav-item">
-          <span className="nav-icon">🕐</span> History
+          <span className="nav-icon">👤</span> Profile
         </button>
-        <button className="nav-item">
-          <span className="nav-icon">⚙️</span> Settings
-        </button>
+        
 
         <div className="sidebar-spacer" />
 

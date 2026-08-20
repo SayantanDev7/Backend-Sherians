@@ -1,0 +1,198 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Profile.css — Styles for the Auth page (Sign Up / Sign In)
+   Matches the split-panel design:
+     Left  → red gradient with welcome text
+     Right → white form panel
+───────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap');
+
+/* Full-screen centered wrapper */
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Card container — holds both left and right panels side by side */
+.auth-container {
+  display: flex;
+  width: 860px;
+  max-width: 96vw;
+  min-height: 520px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  background: #fff;
+  position: relative;
+}
+
+/* ── LEFT PANEL ────────────────────────────────────────────────────────────── */
+.auth-left {
+  width: 42%;
+  background: linear-gradient(145deg, #ff6b35, #e8392a);
+  border-radius: 20px;          /* rounded card inside the container */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 36px;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.auth-left-content {
+  text-align: center;
+  color: #fff;
+}
+
+.auth-left-content h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.auth-left-content p {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.6;
+  margin-bottom: 32px;
+  opacity: 0.9;
+}
+
+/* Outlined toggle button on the left panel */
+.auth-switch-btn {
+  background: transparent;
+  border: 2px solid #fff;
+  color: #fff;
+  padding: 12px 40px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.auth-switch-btn:hover {
+  background: #fff;
+  color: #e8392a;
+}
+
+/* ── RIGHT PANEL ───────────────────────────────────────────────────────────── */
+.auth-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 44px;
+  background: #fff;
+}
+
+/* The actual form inside the right panel */
+.auth-form {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-form h1 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #111;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+/* Text inputs */
+.auth-input {
+  width: 100%;
+  padding: 15px 18px;
+  border: none;
+  border-radius: 10px;
+  background: #f0f2f5;
+  font-size: 0.95rem;
+  font-family: 'Outfit', sans-serif;
+  color: #333;
+  outline: none;
+  transition: box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.auth-input:focus {
+  box-shadow: 0 0 0 2px rgba(232, 57, 42, 0.35);
+}
+
+.auth-input::placeholder {
+  color: #aaa;
+}
+
+/* Red submit button */
+.auth-submit-btn {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, #ff6b35, #e8392a);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error / success feedback message */
+.auth-msg {
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.auth-msg--error {
+  background: #fff0ee;
+  color: #cc2200;
+  border: 1px solid #ffb3a7;
+}
+
+.auth-msg--success {
+  background: #efffef;
+  color: #1a7f37;
+  border: 1px solid #a3e6b0;
+}
+
+/* ── Responsive — stack vertically on small screens ────────────────────────── */
+@media (max-width: 600px) {
+  .auth-container {
+    flex-direction: column;
+    border-radius: 16px;
+  }
+
+  .auth-left {
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    padding: 36px 24px;
+  }
+
+  .auth-right {
+    padding: 32px 24px;
+  }
+}
