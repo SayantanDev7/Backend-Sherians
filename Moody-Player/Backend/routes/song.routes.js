@@ -26,7 +26,9 @@ const upload = multer({
 // req.files → array of file objects [ { buffer, originalname, ... }, ... ]
 // req.body.title, .artist, .mood → arrays of strings [ 'title1', 'title2' ]
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/songs', upload.array('audio', 20), async (req, res) => {
+// FIX: was '/songs' — router is already mounted at /songs in app.js, so path here must be '/'
+// Using '/songs' here would make the full URL /songs/songs (double-nested) → 404
+router.post('/', upload.array('audio', 20), async (req, res) => {
     try {
         const files = req.files; // array of uploaded audio files
 
@@ -96,7 +98,8 @@ router.post('/songs', upload.array('audio', 20), async (req, res) => {
 // GET /songs?mood=happy  → fetch songs by mood
 // GET /songs             → fetch all songs (no mood filter)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/songs", async (req, res) => {
+// FIX: same issue — changed '/songs' to '/' so GET /songs works correctly
+router.get("/", async (req, res) => {
     try {
         const mood = req.query.mood ? req.query.mood.toLowerCase().trim() : null;
         const filter = mood ? { mood: mood } : {};
