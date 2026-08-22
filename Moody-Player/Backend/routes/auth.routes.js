@@ -1,3 +1,5 @@
+//This file is for authentication routes
+
 import express from "express";
 import userModel from "../models/user.model.js";
 import bcrypt from "bcrypt";
