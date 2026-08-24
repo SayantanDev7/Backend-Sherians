@@ -1,20 +1,21 @@
 import express from "express"
+import postController from "../controllers/post.controller.js";
 
-const router = express.Router;
+const router = express.Router();
 
  /* 
- POST/api/posts {for the image file and text} 
- GET/api/posts/:id {to get the particular post}
+ POST/api/create {for the image file and text} 
  GET/api/posts/all {to get all the posts}
+ GET/api/posts/:id {to get the particular post}
  DELETE/api/posts/:id {to delete the post}
  */
 
- router.post("/posts",postController.createPost)
+ router.post("/create",postController.createPost) //its a protected API as we are verifying using token
 
- router.get("/posts/:id",postController.getPost)
+ router.get("/all", postController.getAllPosts)
 
- router.get("/posts/all",postController.getAllPosts)
+ router.get("/:id", postController.getPost)
 
- router.delete("/posts/:id",postController.deletePost)
+ router.delete("/:id", postController.deletePost)
 
  export default router
