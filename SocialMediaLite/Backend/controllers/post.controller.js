@@ -38,8 +38,8 @@ async function createPost(req, res) {
 
         const { imageUrl, caption, aiCaption } = req.body;
 
-        if (!imageUrl) {
-            return res.status(400).json({ message: "imageUrl is required" });
+        if (!imageUrl || !caption) {
+            return res.status(400).json({ message: " imageUrl and caption are required" });
         }
 
         const post = await postModel.create({
@@ -60,12 +60,14 @@ async function createPost(req, res) {
    GET /posts/all
    Returns all posts, newest first
 ───────────────────────────────────────── */
+
+//Find ALL posts → get each author's username/email → show newest posts first.
 async function getAllPosts(req, res) {
     try {
         const posts = await postModel
-            .find()
-            .populate("author", "username email") // adjust fields as needed
-            .sort({ createdAt: -1 });
+            .find() //to get all the posts in form of array
+            .populate("author", "username email") // get the user's username and email by using the user's id  passed in author
+            .sort({ createdAt: -1 }); //return posts in descending order of creation
 
         return res.status(200).json({ message: "Posts fetched successfully", posts });
     } catch (error) {
@@ -78,13 +80,15 @@ async function getAllPosts(req, res) {
    GET /posts/:id
    Returns a single post by ID
 ───────────────────────────────────────── */
+
+//Find ONE specific post → get its author's username/email.
 async function getPost(req, res) {
     try {
         const { id } = req.params;
 
         const post = await postModel
-            .findById(id)
-            .populate("author", "username email");
+            .findById(id) // to find by id
+            .populate("author", "username email"); // to get username and email of author
 
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
