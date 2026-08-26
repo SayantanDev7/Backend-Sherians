@@ -1,31 +1,4 @@
-import jwt from "jsonwebtoken";
-import userModel from "../models/user.model.js";
 import postModel from "../models/post.model.js";
-
-// Helper: verify JWT from cookie and return the user
-async function getAuthenticatedUser(req, res) {
-    const token = req.cookies.token;
-    if (!token) {
-        res.status(401).json({ message: "Unauthorized: Login first" });
-        return null;
-    }
-
-    let decodedToken;
-    try {
-        decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-        res.status(401).json({ message: "Unauthorized: Invalid token" });
-        return null;
-    }
-
-    const user = await userModel.findById(decodedToken.id);
-    if (!user) {
-        res.status(401).json({ message: "Unauthorized: User not found" });
-        return null;
-    }
-
-    return user;
-}
 
 /* ─────────────────────────────────────────
    POST /posts/create   (protected)
@@ -33,8 +6,7 @@ async function getAuthenticatedUser(req, res) {
 ───────────────────────────────────────── */
 async function createPost(req, res) {
     try {
-        const user = await getAuthenticatedUser(req, res);
-        if (!user) return;
+        const user = req.user; // set by authMiddleware
 
         const { imageUrl, caption, aiCaption } = req.body;
 
@@ -106,8 +78,7 @@ async function getPost(req, res) {
 ───────────────────────────────────────── */
 async function deletePost(req, res) {
     try {
-        const user = await getAuthenticatedUser(req, res);
-        if (!user) return;
+        const user = req.user; // set by authMiddleware
 
         const { id } = req.params;
 

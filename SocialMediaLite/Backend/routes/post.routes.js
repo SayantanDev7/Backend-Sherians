@@ -1,5 +1,6 @@
 import express from "express"
 import postController from "../controllers/post.controller.js";
+import authMiddleware from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -10,12 +11,12 @@ const router = express.Router();
  DELETE/api/posts/:id {to delete the post}
  */
 
- router.post("/create",postController.createPost) //its a protected API as we are verifying using token
+ router.post("/create", authMiddleware, postController.createPost) // protected: must be logged in
 
  router.get("/all", postController.getAllPosts)
 
  router.get("/:id", postController.getPost)
 
- router.delete("/:id", postController.deletePost)
+ router.delete("/:id", authMiddleware, postController.deletePost) // protected: author only
 
  export default router
