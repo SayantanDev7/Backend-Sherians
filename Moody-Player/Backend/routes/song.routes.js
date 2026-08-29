@@ -14,8 +14,9 @@
 // song.controller.js — keeping routes clean and easy to read.
 // ============================================================
 
-import express from "express";
-import multer  from "multer";
+import express        from "express";
+import multer         from "multer";
+import authMiddleware from "../middleware/auth.middleware.js";
 
 // Import named exports from the controller
 import {
@@ -35,29 +36,22 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 
 // ─────────────────────────────────────────────────────────────
-// POST /songs
+// POST /songs  [Protected]
 // Upload one or more audio files + metadata in a single request.
 //
-// How to send in Postman (form-data):
-//   Key: audio   Type: File   → select file 1
-//   Key: audio   Type: File   → select file 2  (same key, different file)
-//   Key: title   Type: Text   → "Song 1 Title"
-//   Key: title   Type: Text   → "Song 2 Title"   (order must match audio)
-//   Key: artist  Type: Text   → "Artist 1"
-//   Key: mood    Type: Text   → "happy"           (can be comma-separated)
-//
-// upload.array('audio', 20) → accepts up to 20 audio files under key 'audio'
-// Multer populates req.files (array) and req.body (text fields)
-// then the uploadSongs controller takes over.
+// Middleware pipeline:
+//   1. authMiddleware → checks JWT cookie & ensures user is logged in
+//   2. upload.array   → parses multipart/form-data & audio buffers
+//   3. uploadSongs    → pushes to ImageKit & saves to MongoDB
 // ─────────────────────────────────────────────────────────────
-router.post("/", upload.array("audio", 20), uploadSongs);
+router.post("/", authMiddleware, upload.array("audio", 20), uploadSongs);
 
 
 // ─────────────────────────────────────────────────────────────
 // GET /songs           → fetch ALL songs
 // GET /songs?mood=happy → fetch songs filtered by mood
 //
-// The controller reads req.query.mood and builds the DB filter.
+// Public endpoint: any listener can browse and stream songs.
 // ─────────────────────────────────────────────────────────────
 router.get("/", getSongs);
 
@@ -69,9 +63,10 @@ router.get("/:id", getSongById);
 
 
 // ─────────────────────────────────────────────────────────────
-// DELETE /songs/:id  → delete a song document from MongoDB
+// DELETE /songs/:id  [Protected]
+// Delete a song document from MongoDB
 // ─────────────────────────────────────────────────────────────
-router.delete("/:id", deleteSong);
+router.delete("/:id", authMiddleware, deleteSong);
 
 
 export default router;

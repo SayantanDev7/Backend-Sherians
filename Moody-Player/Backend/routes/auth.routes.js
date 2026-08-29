@@ -9,18 +9,20 @@
 //   POST /auth/signup   Create a new user account
 //   POST /auth/login    Authenticate + issue a JWT cookie
 //   GET  /auth/logout   Clear the JWT cookie
+//   GET  /auth/me       [Protected] Fetch current authenticated user
 //
 // NOTE: Unlike song routes, auth logic lives directly in this file
-// (no separate controller) because there are only 3 small handlers.
+// (no separate controller) because there are only small handlers.
 // Once they grow (e.g. forgot-password, refresh-token), extract them
 // into controllers/auth.controller.js following the same pattern as
 // song.controller.js.
 // ============================================================
 
-import express   from "express";
-import userModel from "../models/user.model.js";
-import bcrypt    from "bcrypt";
-import jwt       from "jsonwebtoken";
+import express        from "express";
+import userModel      from "../models/user.model.js";
+import bcrypt         from "bcrypt";
+import jwt            from "jsonwebtoken";
+import authMiddleware from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -126,6 +128,22 @@ router.post("/login", async (req, res) => {
             username: user.username,
             email   : user.email,
         },
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────
+// GET /auth/me  — Fetch the current logged-in user profile [Protected]
+//
+// FLOW:
+//   authMiddleware validates cookie token & attaches `req.user`
+//   Returns the current user details (without password)
+// ─────────────────────────────────────────────────────────────
+router.get("/me", authMiddleware, (req, res) => {
+    return res.status(200).json({
+        success: true,
+        message: "User profile fetched successfully",
+        user   : req.user,
     });
 });
 

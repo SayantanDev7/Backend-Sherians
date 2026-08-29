@@ -17,10 +17,11 @@
 //   4. Route matcher → hand off to the right router
 // ============================================================
 
-import express    from "express";
-import cors       from "cors";
-import songroutes from "../routes/song.routes.js";
-import authroutes from "../routes/auth.routes.js";
+import express      from "express";
+import cors         from "cors";
+import cookieParser from "cookie-parser";
+import songroutes   from "../routes/song.routes.js";
+import authroutes   from "../routes/auth.routes.js";
 
 const app = express();
 
@@ -33,12 +34,13 @@ app.use(cors({
     credentials: true,
 }));
 
-// ─── Body parsers ────────────────────────────────────────────
+// ─── Body & Cookie parsers ───────────────────────────────────
 // express.json()       → parses application/json bodies
 // express.urlencoded() → parses form-data TEXT fields
-//   (Multer handles the actual file bytes separately in the routes)
+// cookieParser()       → parses cookies from headers and attaches them to req.cookies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // ─── Routes ──────────────────────────────────────────────────
 // Mount each router under a base path.
