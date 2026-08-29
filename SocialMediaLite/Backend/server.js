@@ -3,6 +3,7 @@ import app from "./src/app.js"
 import "dotenv/config";
 import connectToDb from "./config/db.js";
 
+
 const startServer = async () =>{
     try{
         await connectToDb();
