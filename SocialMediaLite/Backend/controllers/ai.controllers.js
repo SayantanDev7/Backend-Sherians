@@ -1,5 +1,17 @@
-import fs from "node:fs";
-import client from "../config/gemini.js";
+import fs     from "node:fs";
+import client, { GEMINI_MODEL } from "../config/gemini.js";
+
+// ─────────────────────────────────────────────────────────────
+// WHY models.generateContent() and NOT interactions.create()?
+//
+// interactions.create() → "Live API" (real-time streaming)
+//   Requires full Google Cloud / Vertex AI credentials (not just an API key)
+//   That's why you got "Could not load the default credentials" error.
+//
+// models.generateContent() → standard REST API
+//   Works with a plain GEMINI_API_KEY from .env ✅
+//   Correct method for one-shot text + image generation tasks.
+// ─────────────────────────────────────────────────────────────
 
 export const generateCaption = async (req, res) => {
     try {
@@ -10,38 +22,51 @@ export const generateCaption = async (req, res) => {
             });
         }
 
-        // Convert image to Base64
+        // Convert image file buffer to Base64 string
+        // Gemini expects images as Base64-encoded strings, not raw binary
         const base64Image = fs.readFileSync(req.file.path, {
             encoding: "base64",
         });
 
-        // Send image + instruction to Gemini
-        const interaction = await client.interactions.create({
-            model: "gemini-3.7-flash",
-
-            input: [
+        // Send image + prompt to Gemini using the standard generateContent API
+        // contents → array of "turns" in the conversation (just one turn here)
+        // parts   → what this turn contains: a text prompt + an inline image
+        const response = await client.models.generateContent({
+            model   : GEMINI_MODEL,  // defined in config/gemini.js — update there if deprecated again
+            contents: [
                 {
-                    type: "text",
-                    text: "Generate a short, natural and engaging caption for this image. Describe only what is visible in the image.",
-                },
-                {
-                    type: "image",
-                    data: base64Image,
-                    mime_type: req.file.mimetype,
+                    parts: [
+                        {
+                            // Text prompt telling Gemini what to do with the image
+                            text: "Generate a short, natural and engaging caption for this image. Describe only what is visible in the image.",
+                        },
+                        {
+                            // inlineData → raw image sent directly in the request (no URL needed)
+                            inlineData: {
+                                mimeType: req.file.mimetype, // e.g. "image/jpeg"
+                                data    : base64Image,       // Base64 encoded image bytes
+                            },
+                        },
+                    ],
                 },
             ],
         });
 
-        // Delete temporary uploaded file
+        // Delete the temp file from disk now that we're done with it
         fs.unlinkSync(req.file.path);
 
-        // Send Gemini's response to frontend
+        // response.text is a convenience getter that returns the generated text directly
         return res.status(200).json({
-            caption: interaction.output_text,
+            caption: response.text,
         });
 
     } catch (error) {
         console.error("AI Caption Error:", error);
+
+        // Clean up temp file even if Gemini call failed
+        if (req.file?.path) {
+            try { fs.unlinkSync(req.file.path); } catch (_) {}
+        }
 
         return res.status(500).json({
             message: "Failed to generate caption",
