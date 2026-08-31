@@ -7,4 +7,4 @@ const client = new GoogleGenAI({
 // Export the model name here so there's one place to update when Google deprecates it
 export const GEMINI_MODEL = "gemini-3.6-flash";
 
-export default client;
+export default client;
