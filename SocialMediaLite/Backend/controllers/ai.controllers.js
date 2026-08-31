@@ -17,6 +17,8 @@ import client, { GEMINI_MODEL } from "../config/gemini.js";
 export const generateCaption = async (req, res) => {
     try {
         // Check if an image was uploaded
+        //req.file contains the uploaded file as binary data or a temporary file reference, depending on how you configure Multer
+        
         if (!req.file) {
             return res.status(400).json({
                 message: "Please upload an image",
@@ -34,12 +36,12 @@ export const generateCaption = async (req, res) => {
         const base64Image = req.file.buffer.toString("base64");
 
         // Send image + prompt to Gemini using the standard generateContent API
-        // contents → array of "turns" in the conversation (just one turn here)
-        // parts   → what this turn contains: a text prompt + an inline image
 
-        //response contains the AI generated content and API metadata
+        //Ask the Gemini model to generate a response based on the input I give it
         const response = await client.models.generateContent({
             model   : GEMINI_MODEL,  // defined in config/gemini.js — update there if deprecated again
+            
+            // contents --> What am I sending to Gemini?
             contents: [
                 {
                     parts: [
@@ -48,15 +50,37 @@ export const generateCaption = async (req, res) => {
                             text: "Generate a short, natural and engaging caption for this image. Describe only what is visible in the image.",
                         },
                         {
-                            // inlineData → raw image sent directly in the request (no URL needed)
+                            // inlineData → I'm putting the actual image data directly inside this request
+                            // raw image sent directly in the request (no URL needed)
                             inlineData: {
-                                mimeType: req.file.mimetype, // e.g. "image/jpeg"
+                                // It tells Gemini what type of file the Base64 data represents.
+                                mimeType: req.file.mimetype, // e.g. "image/jpeg" i.e The Base64 data I'm sending is a JPEG image
                                 data    : base64Image,       // Base64 encoded image bytes
                             },
                         },
                     ],
                 },
             ],
+            // config --> Additional settings that influence the model's response generation process.
+            config: {
+                // systemInstruction --> It sets the context or “role” for the AI.
+                systemInstruction: `
+                You are an expert social media caption writer.
+
+                Your task is to analyze the uploaded image and create a caption for it.
+
+                Rules:
+                - Keep the caption short and engaging.
+                - Describe only what is actually visible in the image.
+                - Do not invent people, locations, events, emotions, or facts.
+                - Make the caption sound natural and human, not robotic.
+                - Match the mood and context of the image.
+                - Avoid generic phrases like "Amazing picture!" unless appropriate.
+                - Add 2-4 relevant hashtags.
+                - Do not explain your reasoning.
+                - Return only the final caption.
+                `,
+            },
         });
 
         // response.text is a convenience getter that returns the generated text directly
