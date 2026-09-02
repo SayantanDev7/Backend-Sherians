@@ -1,32 +1,46 @@
-// ImageKit is a Media Optimization and Delivery service that helps developers manage and deliver digital assets like images and videos more efficiently.
+// ImageKit is a Media Optimization and Delivery service that helps developers
+// manage and deliver digital assets like images and videos more efficiently.
 
 import ImageKit, { toFile } from "@imagekit/nodejs";
 import mongoose from "mongoose";
+import client from "../config/storage-service.js";
 
+// client = initialized ImageKit instance (see config/storage-service.js)
 
-//imagekit initialization
-const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
-});
+const DEFAULT_FOLDER = "/social-media";
 
-// console.log("ImageKit instance:", imagekit);
-// console.log("ImageKit files:", imagekit.files);
-
-async function uploadFile(file) {
+/**
+ * Uploads a file buffer (e.g. from multer) to ImageKit.
+ * @param {object} file - multer file object: { buffer, originalname, mimetype, size }
+ * @param {object} [options]
+ * @param {string} [options.folder] - override destination folder
+ */
+async function uploadFile(file, { folder = DEFAULT_FOLDER } = {}) {
   try {
-    const result = await imagekit.files.upload({
+    const result = await client.files.upload({
       file: await toFile(file.buffer, file.originalname),
-      // We convert the ObjectId to a string and append the original file extension (e.g., .mp3)
-      fileName: `${new mongoose.Types.ObjectId().toString()}.${file.originalname.split('.').pop()}`,
-      // fileName: file.originalname,  //  The filename is stored as "24-07-25T01_01_01_462Z_240725-010101_462Z_song1_4a6fa8a1-8291-46ab-942a-fbc3e0bf6005.mp3" in the server
-      folder: "/songs",
+      // ObjectId + original extension avoids collisions and strips any
+      // client-supplied filename weirdness (spaces, unicode, path traversal attempts)
+      fileName: `${new mongoose.Types.ObjectId().toString()}.${file.originalname.split(".").pop()}`,
+      folder,
     });
+
+    console.log(
+      `[ImageKit] Upload succeeded: ${result.name} (${result.fileType}, ${result.size} bytes) -> ${result.url}`
+    );
 
     return result;
   } catch (error) {
-      console.error(error.stack);
+    if (error instanceof ImageKit.APIError) {
+      console.error(
+        `ImageKit upload failed [${error.status}] ${error.name}: ${error.message}`
+      );
+    } else {
+      console.error("Unexpected upload error:", error.message);
+      if (process.env.NODE_ENV !== "production") {
+        console.error(error.stack);
+      }
+    }
     throw error;
   }
 }

@@ -1,4 +1,5 @@
 import client, { GEMINI_MODEL } from "../config/gemini.js";
+import uploadFile from "../service/storage.service.js";
 
 // ─────────────────────────────────────────────────────────────
 // WHY models.generateContent() and NOT interactions.create()?
@@ -84,8 +85,17 @@ export const generateCaption = async (req, res) => {
         });
 
         // response.text is a convenience getter that returns the generated text directly
+        
+        // ... after generating the caption ...
+        
+        // Upload the image to ImageKit
+        const uploadResult = await uploadFile(req.file);
+
+
         return res.status(200).json({
             caption: response.text,
+            imageUrl: uploadResult.url,        // ImageKit CDN URL
+            fileId: uploadResult.fileId,       // ImageKit file ID (useful for deletion later)
         });
 
     } catch (error) {
@@ -96,3 +106,5 @@ export const generateCaption = async (req, res) => {
         });
     }
 };
+
+
