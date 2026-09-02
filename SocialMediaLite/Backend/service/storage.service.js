@@ -1,3 +1,5 @@
+// ImageKit is a Media Optimization and Delivery service that helps developers manage and deliver digital assets like images and videos more efficiently.
+
 import ImageKit, { toFile } from "@imagekit/nodejs";
 import mongoose from "mongoose";
 
